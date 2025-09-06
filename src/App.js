@@ -4,134 +4,231 @@ import "./App.css";
 const API_BASE = "https://ganesh-backend.onrender.com";
 
 function App() {
-  const [page, setPage] = useState("dashboard");
-  const [expenses, setExpenses] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [item, setItem] = useState("");
-  const [amount, setAmount] = useState("");
-  const [name, setName] = useState("");
-  const [contribution, setContribution] = useState("");
-  const [showAddExpense, setShowAddExpense] = useState(false);
-  const [showAllMembers, setShowAllMembers] = useState(false);
-  const [expenseFile, setExpenseFile] = useState(null);
+  const [page, setPage] = useState("members");
 
+  // Members state
+  const [members, setMembers] = useState([]);
+  const [memberForm, setMemberForm] = useState({ name: "", amount: "" });
+  const [showMembers, setShowMembers] = useState(false);
+  const [editMemberIdx, setEditMemberIdx] = useState(null);
+
+  // Expenses state
+  const [expenses, setExpenses] = useState([]);
+  const [expenseForm, setExpenseForm] = useState({ item: "", amount: "", file: null });
+  const [showExpenses, setShowExpenses] = useState(false);
+  const [editExpenseIdx, setEditExpenseIdx] = useState(null);
+
+  // Pictures state (frontend only)
+  const [pictures, setPictures] = useState([]);
+  const [pictureFile, setPictureFile] = useState(null);
+
+  // Fetch data on mount
   useEffect(() => {
-    fetch(`${API_BASE}/expenses`).then(res => res.json()).then(setExpenses);
     fetch(`${API_BASE}/members`).then(res => res.json()).then(setMembers);
+    fetch(`${API_BASE}/expenses`).then(res => res.json()).then(setExpenses);
   }, []);
 
-  // Add Expense (with optional file upload)
-  const addExpense = async () => {
-    let expenseData = { item, amount };
-    // File upload is optional and not sent to backend unless implemented
-    if (expenseFile) {
-      // You can implement file upload logic here if backend supports it
-      // For now, just ignore the file to avoid deployment issues
+  // --- Members ---
+  const handleMemberInput = e => {
+    setMemberForm({ ...memberForm, [e.target.name]: e.target.value });
+  };
+
+  const addOrEditMember = async () => {
+    if (!memberForm.name || !memberForm.amount) return;
+    if (editMemberIdx !== null) {
+      // Edit (frontend only)
+      const updated = [...members];
+      updated[editMemberIdx] = { ...memberForm };
+      setMembers(updated);
+      setEditMemberIdx(null);
+    } else {
+      // Add (backend)
+      const newMember = { name: memberForm.name, amount: memberForm.amount };
+      await fetch(`${API_BASE}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newMember)
+      });
+      setMembers([...members, newMember]);
     }
-    await fetch(`${API_BASE}/expenses`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(expenseData)
-    });
-    setExpenses([...expenses, expenseData]);
-    setItem(""); setAmount(""); setExpenseFile(null); setShowAddExpense(false);
+    setMemberForm({ name: "", amount: "" });
   };
 
-  // Add Member
-  const addMember = async () => {
-    const memberData = { name, amount: contribution };
-    await fetch(`${API_BASE}/members`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(memberData)
-    });
-    setMembers([...members, memberData]);
-    setName(""); setContribution("");
+  const editMember = idx => {
+    setEditMemberIdx(idx);
+    setMemberForm(members[idx]);
   };
 
-  // UI Components
+  const deleteMember = idx => {
+    // Frontend only (does not persist)
+    setMembers(members.filter((_, i) => i !== idx));
+    if (editMemberIdx === idx) setEditMemberIdx(null);
+  };
+
+  // --- Expenses ---
+  const handleExpenseInput = e => {
+    const { name, value, files } = e.target;
+    setExpenseForm({
+      ...expenseForm,
+      [name]: files ? files[0] : value
+    });
+  };
+
+  const addOrEditExpense = async () => {
+    if (!expenseForm.item || !expenseForm.amount) return;
+    if (editExpenseIdx !== null) {
+      // Edit (frontend only)
+      const updated = [...expenses];
+      updated[editExpenseIdx] = { ...expenseForm, file: expenseForm.file?.name || "" };
+      setExpenses(updated);
+      setEditExpenseIdx(null);
+    } else {
+      // Add (backend, file upload is mocked)
+      const newExpense = { item: expenseForm.item, amount: expenseForm.amount, file: expenseForm.file?.name || "" };
+      await fetch(`${API_BASE}/expenses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newExpense)
+      });
+      setExpenses([...expenses, newExpense]);
+    }
+    setExpenseForm({ item: "", amount: "", file: null });
+  };
+
+  const editExpense = idx => {
+    setEditExpenseIdx(idx);
+    setExpenseForm(expenses[idx]);
+  };
+
+  const deleteExpense = idx => {
+    // Frontend only (does not persist)
+    setExpenses(expenses.filter((_, i) => i !== idx));
+    if (editExpenseIdx === idx) setEditExpenseIdx(null);
+  };
+
+  // --- Pictures (frontend only) ---
+  const handlePictureUpload = e => {
+    setPictureFile(e.target.files[0]);
+  };
+
+  const addPicture = () => {
+    if (pictureFile) {
+      const url = URL.createObjectURL(pictureFile);
+      setPictures([...pictures, { name: pictureFile.name, url }]);
+      setPictureFile(null);
+    }
+  };
+
+  const deletePicture = idx => {
+    setPictures(pictures.filter((_, i) => i !== idx));
+  };
+
+  // --- UI Components ---
   const Navbar = () => (
     <nav className="navbar">
       <span className="brand">Ganesh Finance App</span>
-      <button className={page==="dashboard"?"active":""} onClick={()=>setPage("dashboard")}>Dashboard</button>
       <button className={page==="members"?"active":""} onClick={()=>setPage("members")}>Members</button>
       <button className={page==="expenses"?"active":""} onClick={()=>setPage("expenses")}>Expenses</button>
       <button className={page==="pictures"?"active":""} onClick={()=>setPage("pictures")}>Pictures</button>
     </nav>
   );
 
-  const Dashboard = () => (
-    <div className="dashboard">
-      <h2>Dashboard</h2>
-      <div className="stats">
-        <div className="stat-card">
-          <span>Total Expenses</span>
-          <b>₹{expenses.reduce((s,e)=>s+Number(e.amount),0)}</b>
-        </div>
-        <div className="stat-card">
-          <span>Total Contributions</span>
-          <b>₹{members.reduce((s,m)=>s+Number(m.amount),0)}</b>
-        </div>
-        <div className="stat-card">
-          <span>Balance</span>
-          <b>₹{
-            members.reduce((s,m)=>s+Number(m.amount),0) -
-            expenses.reduce((s,e)=>s+Number(e.amount),0)
-          }</b>
-        </div>
-      </div>
-    </div>
-  );
-
-  const Members = () => (
-    <div className="members-page">
+  const MembersPage = () => (
+    <div>
       <h2>Members</h2>
       <div className="form-row">
-        <input value={name} onChange={e=>setName(e.target.value)} placeholder="Name" />
-        <input value={contribution} onChange={e=>setContribution(e.target.value)} placeholder="Amount" type="number" />
-        <button onClick={addMember}>Add</button>
-        <button onClick={()=>setShowAllMembers(!showAllMembers)}>
-          {showAllMembers ? "Hide All" : "View All Members"}
+        <input
+          name="name"
+          value={memberForm.name}
+          onChange={handleMemberInput}
+          placeholder="Name"
+        />
+        <input
+          name="amount"
+          value={memberForm.amount}
+          onChange={handleMemberInput}
+          placeholder="Amount"
+          type="number"
+        />
+        <button onClick={addOrEditMember}>{editMemberIdx !== null ? "Update" : "Add"}</button>
+        <button onClick={()=>setShowMembers(!showMembers)}>
+          {showMembers ? "Hide Members" : "View Members"}
         </button>
       </div>
-      {showAllMembers && (
-        <div className="members-list">
-          <h3>All Members</h3>
-          <ul>
-            {members.map((m,i)=><li key={i}>{m.name} - ₹{m.amount}</li>)}
-          </ul>
+      {showMembers && (
+        <div className="vertical-list">
+          {members.map((m, i) => (
+            <div className="list-row" key={i}>
+              <span>{m.name}</span>
+              <span>₹{m.amount}</span>
+              <button className="edit-btn" onClick={()=>editMember(i)}>Edit</button>
+              <button className="delete-btn" onClick={()=>deleteMember(i)}>Delete</button>
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
 
-  const Expenses = () => (
-    <div className="expenses-page">
+  const ExpensesPage = () => (
+    <div>
       <h2>Expenses</h2>
-      <button className="add-expense-btn" onClick={()=>setShowAddExpense(!showAddExpense)}>
-        {showAddExpense ? "Cancel" : "Add Expense"}
-      </button>
-      {showAddExpense && (
-        <div className="form-row">
-          <input value={item} onChange={e=>setItem(e.target.value)} placeholder="Item Name" />
-          <input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="Amount" type="number" />
-          <input type="file" onChange={e=>setExpenseFile(e.target.files[0])} style={{maxWidth:180}} />
-          <button onClick={addExpense}>Save</button>
+      <div className="form-row">
+        <input
+          name="item"
+          value={expenseForm.item}
+          onChange={handleExpenseInput}
+          placeholder="Item Name"
+        />
+        <input
+          name="amount"
+          value={expenseForm.amount}
+          onChange={handleExpenseInput}
+          placeholder="Amount"
+          type="number"
+        />
+        <input
+          name="file"
+          type="file"
+          onChange={handleExpenseInput}
+        />
+        <button onClick={addOrEditExpense}>{editExpenseIdx !== null ? "Update" : "Add Expense"}</button>
+        <button onClick={()=>setShowExpenses(!showExpenses)}>
+          {showExpenses ? "Hide Expenses" : "View Expenses"}
+        </button>
+      </div>
+      {showExpenses && (
+        <div className="vertical-list">
+          {expenses.map((e, i) => (
+            <div className="list-row" key={i}>
+              <span>{e.item}</span>
+              <span>₹{e.amount}</span>
+              <span className="file-proof">{e.file ? `📎 ${e.file}` : ""}</span>
+              <button className="edit-btn" onClick={()=>editExpense(i)}>Edit</button>
+              <button className="delete-btn" onClick={()=>deleteExpense(i)}>Delete</button>
+            </div>
+          ))}
         </div>
       )}
-      <div className="expenses-list">
-        <h3>All Expenses</h3>
-        <ul>
-          {expenses.map((e,i)=><li key={i}>{e.item} - ₹{e.amount}</li>)}
-        </ul>
-      </div>
     </div>
   );
 
-  const Pictures = () => (
-    <div className="pictures-page">
+  const PicturesPage = () => (
+    <div>
       <h2>Pictures</h2>
-      <p style={{color:"#888"}}>Picture gallery coming soon!</p>
+      <div className="form-row">
+        <input type="file" accept="image/*" onChange={handlePictureUpload} />
+        <button onClick={addPicture}>Upload</button>
+      </div>
+      <div className="pictures-list">
+        {pictures.map((pic, i) => (
+          <div className="picture-row" key={i}>
+            <img src={pic.url} alt={pic.name} />
+            <span>{pic.name}</span>
+            <button className="delete-btn" onClick={()=>deletePicture(i)}>Delete</button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 
@@ -139,10 +236,9 @@ function App() {
     <div className="container fancy-bg">
       <Navbar />
       <main>
-        {page === "dashboard" && <Dashboard />}
-        {page === "members" && <Members />}
-        {page === "expenses" && <Expenses />}
-        {page === "pictures" && <Pictures />}
+        {page === "members" && <MembersPage />}
+        {page === "expenses" && <ExpensesPage />}
+        {page === "pictures" && <PicturesPage />}
       </main>
     </div>
   );
