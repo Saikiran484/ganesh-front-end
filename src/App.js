@@ -11,8 +11,8 @@ function App() {
   const [contribution, setContribution] = useState("");
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/expenses").then(res => res.json()).then(setExpenses);
-    fetch("http://127.0.0.1:5000/members").then(res => res.json()).then(setMembers);
+    fetch("https://ganesh-backend.onrender.com/expenses").then(res => res.json()).then(setExpenses);
+    fetch("https://ganesh-backend.onrender.com/members").then(res => res.json()).then(setMembers);
   }, []);
 
   const addExpense = () => {
